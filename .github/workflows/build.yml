@@ -30,7 +30,7 @@ jobs:
         working-directory: SleepAlarmHide
         run: |
           set -euo pipefail
-          sed -i '' 's/^Version:.*/Version: 5.2.0~native1/' control
+          sed -i '' 's/^Version:.*/Version: 5.2.0~native2/' control
           make clean THEOS_PACKAGE_SCHEME=roothide ARCHS=arm64e
           make package THEOS_PACKAGE_SCHEME=roothide ARCHS=arm64e
           shopt -s nullglob
