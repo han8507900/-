@@ -1,0 +1,47 @@
+name: Build SleepAlarmHide native arm64e
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  roothide:
+    runs-on: macos-15
+    env:
+      THEOS: ${{ github.workspace }}/theos-roothide
+      HOMEBREW_NO_AUTO_UPDATE: 1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract project
+        run: unzip -q SleepAlarmHide-native-source.zip
+      - uses: actions/checkout@v4
+        with:
+          repository: roothide/theos
+          path: theos-roothide
+          submodules: recursive
+      - name: Install build dependencies and SDK
+        run: |
+          set -euo pipefail
+          brew install ldid dpkg xz
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/theos/sdks.git "$RUNNER_TEMP/axs-sdk"
+          git -C "$RUNNER_TEMP/axs-sdk" sparse-checkout set iPhoneOS16.5.sdk
+          mkdir -p "$THEOS/sdks"
+          cp -R "$RUNNER_TEMP/axs-sdk/iPhoneOS16.5.sdk" "$THEOS/sdks/"
+      - name: Build and check the native package
+        working-directory: SleepAlarmHide
+        run: |
+          set -euo pipefail
+          sed -i '' 's/^Version:.*/Version: 5.2.0~native1/' control
+          make clean THEOS_PACKAGE_SCHEME=roothide ARCHS=arm64e
+          make package THEOS_PACKAGE_SCHEME=roothide ARCHS=arm64e
+          shopt -s nullglob
+          packages=(packages/*.deb)
+          [[ ${#packages[@]} -eq 1 ]]
+          [[ $(dpkg-deb -f "${packages[0]}" Architecture) == iphoneos-arm64e ]]
+          dpkg-deb -x "${packages[0]}" "$RUNNER_TEMP/axs-deb"
+          dylib="$RUNNER_TEMP/axs-deb/Library/MobileSubstrate/DynamicLibraries/AxsSleepAlarmHide.dylib"
+          [[ $(xcrun lipo -archs "$dylib") == arm64e ]]
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SleepAlarmHide-native-arm64e
+          path: SleepAlarmHide/packages/*.deb
+          if-no-files-found: error
